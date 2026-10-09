@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<!--
+  GROWTH SPARK - Student Analytics App (single file: HTML + CSS + JavaScript)
+  Open this file in a browser. Chart.js, jsPDF and the fonts load from the internet.
+  Accounts and messages are stored in this browser only (demo, not real security).
+  Teacher access code: change TEACHER_CODE in the script before sharing.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GROWTH SPARK</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="auth" class="authbox">
+  <h1>GROWTH <i>SPARK</i></h1><p class="sub">Log in to see student analytics.</p>
+  <div class="panel" style="margin-top:16px">
+    <div class="nav" id="rtabs" role="group" aria-label="Account type"><button type="button" data-r="student" class="cur">Student</button><button type="button" data-r="teacher">Teacher</button></div>
+    <p class="sub" id="roleNote"></p>
+    <div class="nav" id="atabs"><button type="button" data-t="login" class="cur">Log in</button><button type="button" data-t="reg">Register</button></div>
+    <p class="msg" id="amsg" role="alert"></p>
+    <form id="fLogin" class="f1">
+      <label>Email or ID<input id="lEmail" autocomplete="username" required></label>
+      <label>Password<input id="lPass" type="password" autocomplete="current-password" required></label>
+      <button class="pri" type="submit">Log in</button>
+      <button type="button" id="toForgot" style="border:0;background:none;padding:0;color:var(--brand);text-decoration:underline;justify-self:start">Forgot password?</button>
+    </form>
+    <form id="fReg" class="f1" hidden>
+      <label id="rCodeL" hidden>Teacher access code<input id="rCode" autocomplete="off"></label>
+      <label>Full name<input id="rName" autocomplete="name" required></label>
+      <label>Email<input id="rEmail" type="email" autocomplete="email" required></label>
+      <label>Department<input id="rDept" list="deps" placeholder="e.g. CSE" required></label>
+      <label>Password (6 or more characters)<input id="rPass" type="password" autocomplete="new-password" minlength="6" required></label>
+      <label>Confirm password<input id="rConf" type="password" autocomplete="new-password" required></label>
+      <button class="pri" type="submit">Create account</button>
+    </form>
+    <form id="fForgot" class="f1" hidden>
+      <label>Registered email<input id="fEmail" type="email" autocomplete="email" required></label>
+      <button class="pri" type="submit">Generate demo code</button>
+      <button type="button" id="toLogin2">Back to log in</button>
+    </form>
+    <form id="fReset" class="f1" hidden style="margin-top:14px">
+      <label>6-digit code<input id="oCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required></label>
+      <label>New password<input id="oPass" type="password" minlength="6" autocomplete="new-password" required></label>
+      <label>Confirm new password<input id="oConf" type="password" minlength="6" autocomplete="new-password" required></label>
+      <button class="pri" type="submit">Reset password</button>
+    </form>
+    <datalist id="deps"><option>EEE</option><option>CSE</option><option>ECE</option><option>MECH</option><option>IT</option><option>AIDS</option></datalist>
+  </div>
+</div>
+<div class="wrap" id="app" hidden>
+<header>
+  <div><h1>GROWTH <i>SPARK</i></h1><p class="sub">Spot struggling students early and know what to do next.</p></div>
+  <div class="bar"><select id="fd" aria-label="Department"></select><span class="sub" id="who"></span><button id="theme" type="button">Toggle theme</button><button id="logout" type="button">Log out</button></div>
+</header>
+<nav class="nav" id="nav" aria-label="Pages"><button type="button" data-p="dash">Dashboard</button><button type="button" data-p="warn">Early warnings</button><button type="button" data-p="stu">Students</button><button type="button" data-p="seg">Segments</button><button type="button" data-p="focus">Focus quiz</button><button type="button" data-p="guide">Guidance</button><button type="button" data-p="chat" hidden>Teachers' room</button><button type="button" data-p="note">Notifications</button><button type="button" data-p="acct">Account</button><button type="button" data-p="data">Manage data</button></nav>
+<p class="msg" id="msg" role="status"></p>
+
+<div class="page on" id="p-dash">
+<section class="kpis" aria-label="Summary">
+  <div class="kpi"><div class="big" id="total">0</div><span>Students</span></div>
+  <div class="kpi"><div class="big" id="avg">0</div><span>Average success score</span></div>
+  <div class="kpi warn"><div class="big" id="risk">0</div><span>High-risk students</span></div>
+  <div class="kpi"><div class="big" id="att">0</div><span>Average attendance</span></div>
+  <div class="kpi"><div class="big" id="mk">0</div><span>Average marks</span></div>
+  <div class="kpi"><div class="big" id="ready">0</div><span>Placement ready (60+)</span></div>
+</section>
+
+<div class="grid">
+  <section class="panel"><h2>Risk levels</h2><div class="chartbox"><canvas id="chart" role="img" aria-label="Doughnut chart of students by risk level"></canvas></div>
+    <div style="margin-top:10px" id="segs"></div></section>
+  <section class="panel"><h2>Early warnings</h2><div id="alerts"></div></section>
+</div>
+
+<section class="panel" style="margin-top:16px"><h2>By department</h2><div class="scroll"><table style="min-width:420px"><thead><tr><th>Department</th><th>Students</th><th>Avg success</th><th>High risk</th></tr></thead><tbody id="deptTb"></tbody></table></div></section>
+</div>
+<div class="page" id="p-warn"><section class="panel"><h2>Early warnings</h2><p class="sub" style="margin:-8px 0 12px">Students at Medium or High risk, most urgent first.</p><div id="alertsAll"></div></section></div>
+<div class="page" id="p-stu"><section class="panel">
+  <h2>All students</h2>
+  <div class="tools">
+    <input type="search" id="q" placeholder="Search by name or ID" aria-label="Search by name or ID">
+    <button id="pdfBtn" type="button">Download PDF report</button><button id="shareBtn" type="button">Share PDF</button><button id="waBtn" type="button">WhatsApp summary</button><select id="f" aria-label="Filter by risk"><option value="">All risk levels</option><option>High</option><option>Medium</option><option>Low</option></select>
+  </div>
+  <div class="scroll"><table>
+    <thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Risk score</th><th>Risk</th><th>Success</th><th>Segment</th><th>Weakest area</th></tr></thead>
+    <tbody id="tb"></tbody>
+  </table></div>
+  <p class="hint">Risk score runs 0–100, higher is worse. Success score runs 0–100, higher is better. CSV columns: id, name, attendance, marks, assignments, study_hours (required); placement, skills, engagement (optional). Older GrowthSpark files with cgpa and lms also work.</p>
+</section></div>
+<div class="page" id="p-seg"><div id="segPage"></div></div>
+<div class="page" id="p-focus"><section class="panel"><h2>Focus quiz</h2><div class="stat ok" id="fstat" role="status">Student is active</div><div class="stat bad" id="fwarn" role="alert" hidden></div><div id="quiz"></div></section><section class="panel" style="margin-top:16px"><h2>Focus results</h2><div id="fres"></div></section></div>
+<div class="page" id="p-guide"><section class="panel"><h2>Department guidance</h2><p class="sub" style="margin:-8px 0 12px">Higher education, skill apps and placement companies for each department, with a tip for each student.</p><select id="gd" aria-label="Department"></select><div id="gbody" style="margin-top:14px"></div></section></div>
+<div class="page" id="p-chat"><section class="panel chat"><h2>Teachers' room</h2>
+  <div class="messages" id="messages" aria-live="polite"></div>
+  <div class="message-input"><input id="messageInput" placeholder="Type a message" maxlength="500" aria-label="Message"><button class="pri" id="sendMsg" type="button">Send</button></div>
+  <button id="enableNotif" type="button">Enable notifications</button>
+  <p class="hint">Only teachers can see this room. Messages are saved only in this browser and shared by the teacher accounts on it.</p>
+</section>
+<section class="panel chat" style="margin-top:16px"><h2>Message students</h2>
+  <div class="f1"><label>Send to<select id="annTo"></select></label>
+  <label>Message<textarea id="annText" rows="3" maxlength="300" placeholder="Write a message for students"></textarea></label>
+  <button class="pri" id="annSend" type="button">Send to students</button></div>
+  <p class="msg" id="annMsg" role="status"></p>
+  <h3 style="font-size:16px;margin:6px 0">Sent by you</h3><div id="annList"></div>
+  <p class="hint">Students get these as notifications in the app. This works for student accounts on this browser only.</p>
+</section></div>
+<div class="page" id="p-note"><section class="panel"><h2>Notifications</h2><div class="tools"><button id="nPerm" type="button">Turn on device notifications</button><button id="nTest" type="button">Send test notification</button></div><div id="nList"></div></section></div>
+<div class="page" id="p-acct"><section class="panel"><h2>My account</h2><div id="acct"></div></section></div>
+<div class="page" id="p-data"><section class="panel"><h2>Manage data</h2><p class="sub">Add one student, import a class from a CSV file, or return to the sample data.</p><div class="bar" style="margin-top:12px"><button class="pri" id="add" type="button">Add student</button><label class="btn" for="csv">Import CSV<input id="csv" type="file" accept=".csv,text/csv"></label><button id="reset" type="button">Reset data</button></div><p class="hint">CSV columns: id, name, attendance, marks, assignments, study_hours (required); placement, skills, engagement, department (optional). Older GrowthSpark files with cgpa and lms also work.</p></section></div>
+</div>
+
+<div id="toast" class="toast" role="status" hidden></div>
+<dialog id="dlg"><div id="dbody"></div><div class="row"><button type="button" id="close">Close</button></div></dialog>
+
+<script src="script.js"></script>
+</body>
+</html>
